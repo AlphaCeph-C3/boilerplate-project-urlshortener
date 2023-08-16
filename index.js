@@ -10,6 +10,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 app.use(cors());
 
 app.use('/public', express.static(`${process.cwd()}/public`));
@@ -23,64 +24,87 @@ app.get('/api/hello', function (req, res) {
   res.json({ greeting: 'hello API' });
 });
 
-const filePath = `${process.cwd()}/urlData.json`;
+const urlArr = [];
 
-app.post('/api/shorturl', function (req, res) {
+app.post('/api/shorturl', (req, res) => {
   const { url } = req.body;
-  try {
-    // checking if the url is valid
-    const newUrl = new URL(url);
-    console.log(newUrl.protocol);
-    if (newUrl.protocol !== 'http:' && newUrl.protocol !== 'https:')
-      throw new Error('this is invalid url');
-    const fileExists = fs.existsSync(filePath);
-    const original_url = url;
-    if (fileExists) {
-      // reading from the file to see append the key and value pair
-      fs.readFile(filePath, 'utf-8', (err, fd) => {
-        if (err) throw err;
-        const jsonData = JSON.parse(fd);
-        const length = Object.keys(jsonData).length;
-        jsonData[`${length + 1}`] = url;
-        fs.writeFile(filePath, JSON.stringify(jsonData), (err) => {
-          if (err) {
-            console.log(err);
-          }
-        });
-        res.json({
-          original_url,
-          short_url: length + 1,
-        });
-      });
+  const urlObj = new URL(url);
+
+  dns.lookup(urlObj.hostname, (err, address, family) => {
+    if (err) {
+      res.json({ error: 'invalid url' });
     } else {
-      const data = { 1: url };
-      fs.writeFile(filePath, JSON.stringify(data), (err) => {
-        if (err) {
-          console.log(err);
-        }
-      });
-      res.json({
-        original_url,
-        short_url: 1,
-      });
+      if (!urlArr.includes(url)) {
+        urlArr.push(url);
+      }
+      res.json({ original_url: url, short_url: urlArr.indexOf(url) + 1 });
     }
-  } catch (err) {
-    res.json({ error: 'invalid url' });
-  }
+  });
 });
 
-app.get('/api/shorturl/:key', function (req, res) {
-  try {
-    const { key } = req.params;
-    fs.readFile(filePath, 'utf-8', (err, fd) => {
-      const jsonData = JSON.parse(fd);
-      res.redirect(jsonData[key]);
-    });
-  } catch (err) {
-    res.json({ error: 'No such url is found' });
-  }
+app.get('/api/shorturl/:url', (req, res) => {
+  const { url } = req.params;
+  res.redirect(urlArr[url - 1]);
 });
 
 app.listen(port, function () {
   console.log(`Listening on port ${port}`);
 });
+
+// const filePath = `${process.cwd()}/urlData.json`;
+
+// app.post('/api/shorturl', function (req, res) {
+//   const { url } = req.body;
+//   try {
+//     // checking if the url is valid
+//     const newUrl = new URL(url);
+//     console.log(newUrl.protocol);
+//     if (newUrl.protocol !== 'http:' && newUrl.protocol !== 'https:')
+//       throw new Error('this is invalid url');
+//     const fileExists = fs.existsSync(filePath);
+//     const original_url = url;
+//     if (fileExists) {
+//       // reading from the file to see append the key and value pair
+//       fs.readFile(filePath, 'utf-8', (err, fd) => {
+//         if (err) throw err;
+//         const jsonData = JSON.parse(fd);
+//         const length = Object.keys(jsonData).length;
+//         jsonData[`${length + 1}`] = url;
+//         fs.writeFile(filePath, JSON.stringify(jsonData), (err) => {
+//           if (err) {
+//             console.log(err);
+//           }
+//         });
+//         res.json({
+//           original_url,
+//           short_url: length + 1,
+//         });
+//       });
+//     } else {
+//       const data = { 1: url };
+//       fs.writeFile(filePath, JSON.stringify(data), (err) => {
+//         if (err) {
+//           console.log(err);
+//         }
+//       });
+//       res.json({
+//         original_url,
+//         short_url: 1,
+//       });
+//     }
+//   } catch (err) {
+//     res.json({ error: 'invalid url' });
+//   }
+// });
+
+// app.get('/api/shorturl/:key', function (req, res) {
+//   try {
+//     const { key } = req.params;
+//     fs.readFile(filePath, 'utf-8', (err, fd) => {
+//       const jsonData = JSON.parse(fd);
+//       res.redirect(jsonData[key]);
+//     });
+//   } catch (err) {
+//     res.json({ error: 'No such url is found' });
+//   }
+// });
